@@ -1,0 +1,41 @@
+services:
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: cf-cookie-flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      LOG_LEVEL: info
+
+  cf-cookie-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cf-cookie-api
+    restart: unless-stopped
+    depends_on:
+      - flaresolverr
+    ports:
+      - "8090:8090"
+    environment:
+      FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://flaresolverr:8191}
+      TARGET_URL: ${TARGET_URL:-https://grok.com}
+      TIMEOUT_SEC: ${TIMEOUT_SEC:-90}
+      BASE_PROXY_URL: ${BASE_PROXY_URL:-}
+      WARP_AUTO_PRIORITY: ${WARP_AUTO_PRIORITY:-true}
+      WARP_PROXY_URL: ${WARP_PROXY_URL:-socks5://warp:1080}
+      API_KEY: ${API_KEY:-}
+
+  # Enable this block if egress IP quality is poor.
+  # After enabling, service will auto-prioritize Warp proxy when available.
+  # warp:
+  #   container_name: cf-cookie-warp
+  #   image: caomingjun/warp:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:1080:1080"
+  #   environment:
+  #     - WARP_SLEEP=2
+  #   cap_add:
+  #     - NET_ADMIN
