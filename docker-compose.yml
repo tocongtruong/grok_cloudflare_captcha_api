@@ -45,17 +45,28 @@ services:
   #     - NET_ADMIN
 
   # ================create_proxy============
-  # HTTP proxy for callers on another VPS (e.g. n8n).
+  # Authenticated HTTP proxy for callers on another VPS (e.g. n8n).
   # All runtime values are sourced from .env.
   # If PUBLIC_PROXY_URL is empty, API auto-builds url_proxy from egress_ip + AUTO_HTTP_PROXY_*.
   
   http-proxy:
     container_name: cf-cookie-http-proxy
-    image: dannydirect/tinyproxy:latest
+    image: alpine:3.20
     restart: unless-stopped
     ports:
-      - "${AUTO_HTTP_PROXY_PORT:-3128}:3128"
-    environment:
-      BASIC_AUTH_USER: ${AUTO_HTTP_PROXY_USER:-proxyuser}
-      BASIC_AUTH_PASSWORD: ${AUTO_HTTP_PROXY_PASSWORD:-change_me}
-      ALLOWED_NETWORKS: ${HTTP_PROXY_ALLOWED_NETWORKS:-127.0.0.1/32}
+      - "${AUTO_HTTP_PROXY_PORT:-3128}:8888"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        apk add --no-cache 3proxy >/dev/null
+        cat >/etc/3proxy/3proxy.cfg <<CFG
+        daemon
+        nscache 65536
+        auth strong
+        users ${AUTO_HTTP_PROXY_USER:-proxyuser}:CL:${AUTO_HTTP_PROXY_PASSWORD:-change_me}
+        allow ${AUTO_HTTP_PROXY_USER:-proxyuser}
+        proxy -n -a -p8888
+        flush
+        CFG
+        exec 3proxy /etc/3proxy/3proxy.cfg
