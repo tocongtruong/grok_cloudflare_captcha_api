@@ -55,13 +55,12 @@ services:
     restart: unless-stopped
     ports:
       - "${AUTO_HTTP_PROXY_PORT:-3128}:8888"
-    command:
+    entrypoint:
       - /bin/sh
       - -ec
       - |
         mkdir -p /etc/3proxy
         cat >/etc/3proxy/3proxy.cfg <<CFG
-        daemon
         nscache 65536
         auth strong
         users ${AUTO_HTTP_PROXY_USER:-proxyuser}:CL:${AUTO_HTTP_PROXY_PASSWORD:-change_me}
