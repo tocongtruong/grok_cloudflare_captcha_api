@@ -14,7 +14,7 @@ class HeaderInfo(BaseModel):
 
 class NetworkInfo(BaseModel):
     proxy_mode: str
-    proxy_url: str
+    url_proxy: str
     egress_ip: str
     egress_ip_source: str
 

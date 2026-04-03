@@ -1,6 +1,6 @@
 from functools import lru_cache
 import socket
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 import requests
@@ -100,6 +100,23 @@ def pick_proxy_url(settings: Settings) -> str:
     return ""
 
 
+def build_public_http_proxy_url(settings: Settings, public_ip: str) -> str:
+    ip = (public_ip or "").strip()
+    if not ip:
+        return ""
+
+    port = int(settings.auto_http_proxy_port)
+    user = (settings.auto_http_proxy_user or "").strip()
+    password = (settings.auto_http_proxy_password or "").strip()
+
+    if user:
+        encoded_user = quote(user, safe="")
+        encoded_pass = quote(password, safe="")
+        return f"http://{encoded_user}:{encoded_pass}@{ip}:{port}"
+
+    return f"http://{ip}:{port}"
+
+
 def proxy_mode(settings: Settings, active_proxy: str) -> str:
     if active_proxy and active_proxy == (settings.warp_proxy_url or "").strip():
         return "warp"
@@ -130,10 +147,20 @@ def detect_egress_ip(timeout_sec: int, proxy_url: str = "") -> tuple[str, str]:
 
 
 def build_network_info(settings: Settings, active_proxy: str) -> NetworkInfo:
+    mode = proxy_mode(settings, active_proxy)
     ip, source = detect_egress_ip(settings.timeout_sec, active_proxy)
+
+    # For cross-VPS clients, always prefer explicit public proxy URL.
+    # If not provided, auto-build one from detected public IP and HTTP proxy credentials.
+    display_proxy = (settings.public_proxy_url or "").strip()
+    if not display_proxy and settings.auto_http_proxy_enabled and ip:
+        display_proxy = build_public_http_proxy_url(settings, ip)
+    if not display_proxy:
+        display_proxy = active_proxy
+
     return NetworkInfo(
-        proxy_mode=proxy_mode(settings, active_proxy),
-        proxy_url=active_proxy,
+        proxy_mode=mode,
+        url_proxy=display_proxy,
         egress_ip=ip,
         egress_ip_source=source,
     )

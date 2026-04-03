@@ -23,12 +23,16 @@ services:
       TARGET_URL: ${TARGET_URL:-https://grok.com}
       TIMEOUT_SEC: ${TIMEOUT_SEC:-90}
       BASE_PROXY_URL: ${BASE_PROXY_URL:-}
-      WARP_AUTO_PRIORITY: ${WARP_AUTO_PRIORITY:-true}
-      WARP_PROXY_URL: ${WARP_PROXY_URL:-socks5://warp:1080}
+      WARP_AUTO_PRIORITY: ${WARP_AUTO_PRIORITY:-false}
+      AUTO_HTTP_PROXY_ENABLED: ${AUTO_HTTP_PROXY_ENABLED:-true}
+      AUTO_HTTP_PROXY_PORT: ${AUTO_HTTP_PROXY_PORT:-3128}
+      AUTO_HTTP_PROXY_USER: ${AUTO_HTTP_PROXY_USER:-}
+      AUTO_HTTP_PROXY_PASSWORD: ${AUTO_HTTP_PROXY_PASSWORD:-}
+      PUBLIC_PROXY_URL: ${PUBLIC_PROXY_URL:-}
       API_KEY: ${API_KEY:-}
 
-  # Enable this block if egress IP quality is poor.
-  # After enabling, service will auto-prioritize Warp proxy when available.
+  # ==================warp===========
+
   # warp:
   #   container_name: cf-cookie-warp
   #   image: caomingjun/warp:latest
@@ -39,3 +43,19 @@ services:
   #     - WARP_SLEEP=2
   #   cap_add:
   #     - NET_ADMIN
+
+  # ================create_proxy============
+  # HTTP proxy for callers on another VPS (e.g. n8n).
+  # All runtime values are sourced from .env.
+  # If PUBLIC_PROXY_URL is empty, API auto-builds url_proxy from egress_ip + AUTO_HTTP_PROXY_*.
+  
+  http-proxy:
+    container_name: cf-cookie-http-proxy
+    image: dannydirect/tinyproxy:latest
+    restart: unless-stopped
+    ports:
+      - "${AUTO_HTTP_PROXY_PORT:-3128}:3128"
+    environment:
+      BASIC_AUTH_USER: ${AUTO_HTTP_PROXY_USER:-proxyuser}
+      BASIC_AUTH_PASSWORD: ${AUTO_HTTP_PROXY_PASSWORD:-change_me}
+      ALLOWED_NETWORKS: ${HTTP_PROXY_ALLOWED_NETWORKS:-127.0.0.1/32}

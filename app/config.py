@@ -29,6 +29,11 @@ class Settings:
     base_proxy_url: str
     warp_auto_priority: bool
     warp_proxy_url: str
+    auto_http_proxy_enabled: bool
+    auto_http_proxy_port: int
+    auto_http_proxy_user: str
+    auto_http_proxy_password: str
+    public_proxy_url: str
     api_key: str
 
     @classmethod
@@ -40,5 +45,10 @@ class Settings:
             base_proxy_url=(os.getenv("BASE_PROXY_URL", "") or "").strip(),
             warp_auto_priority=parse_bool(os.getenv("WARP_AUTO_PRIORITY", "true"), default=True),
             warp_proxy_url=(os.getenv("WARP_PROXY_URL", "socks5://warp:1080") or "socks5://warp:1080").strip(),
+            auto_http_proxy_enabled=parse_bool(os.getenv("AUTO_HTTP_PROXY_ENABLED", "true"), default=True),
+            auto_http_proxy_port=parse_int(os.getenv("AUTO_HTTP_PROXY_PORT", "3128"), default=3128, min_value=1),
+            auto_http_proxy_user=(os.getenv("AUTO_HTTP_PROXY_USER", "") or "").strip(),
+            auto_http_proxy_password=(os.getenv("AUTO_HTTP_PROXY_PASSWORD", "") or "").strip(),
+            public_proxy_url=(os.getenv("PUBLIC_PROXY_URL", "") or "").strip(),
             api_key=(os.getenv("API_KEY", "") or "").strip(),
         )
