@@ -51,7 +51,7 @@ services:
   
   http-proxy:
     container_name: cf-cookie-http-proxy
-    image: alpine:3.20
+    image: ghcr.io/tarampampam/3proxy:latest
     restart: unless-stopped
     ports:
       - "${AUTO_HTTP_PROXY_PORT:-3128}:8888"
@@ -59,7 +59,7 @@ services:
       - /bin/sh
       - -ec
       - |
-        apk add --no-cache 3proxy >/dev/null
+        mkdir -p /etc/3proxy
         cat >/etc/3proxy/3proxy.cfg <<CFG
         daemon
         nscache 65536
@@ -69,4 +69,4 @@ services:
         proxy -n -a -p8888
         flush
         CFG
-        exec 3proxy /etc/3proxy/3proxy.cfg
+        exec /bin/3proxy /etc/3proxy/3proxy.cfg
