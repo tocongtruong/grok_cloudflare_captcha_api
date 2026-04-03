@@ -3,9 +3,10 @@ import socket
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+import requests
 
 from app.config import Settings
-from app.models import HeaderInfo, SolveRequest, SolveResponse, TokenRequest, TokenResponse
+from app.models import HeaderInfo, NetworkInfo, SolveRequest, SolveResponse, TokenRequest, TokenResponse
 from app.quota import QuotaError, inspect_token_upstream
 from app.solver import SolveError, solve_cloudflare
 
@@ -99,6 +100,45 @@ def pick_proxy_url(settings: Settings) -> str:
     return ""
 
 
+def proxy_mode(settings: Settings, active_proxy: str) -> str:
+    if active_proxy and active_proxy == (settings.warp_proxy_url or "").strip():
+        return "warp"
+    if active_proxy:
+        return "base_proxy"
+    return "direct"
+
+
+def detect_egress_ip(timeout_sec: int, proxy_url: str = "") -> tuple[str, str]:
+    endpoints = (
+        "https://api.ipify.org?format=text",
+        "https://ifconfig.me/ip",
+    )
+    proxies = None
+    if proxy_url:
+        proxies = {"http": proxy_url, "https": proxy_url}
+
+    for endpoint in endpoints:
+        try:
+            response = requests.get(endpoint, timeout=max(5, min(timeout_sec, 20)), proxies=proxies)
+            if response.ok:
+                ip = (response.text or "").strip()
+                if ip:
+                    return ip, endpoint
+        except requests.RequestException:
+            continue
+    return "", ""
+
+
+def build_network_info(settings: Settings, active_proxy: str) -> NetworkInfo:
+    ip, source = detect_egress_ip(settings.timeout_sec, active_proxy)
+    return NetworkInfo(
+        proxy_mode=proxy_mode(settings, active_proxy),
+        proxy_url=active_proxy,
+        egress_ip=ip,
+        egress_ip_source=source,
+    )
+
+
 def require_api_key(
     x_api_key: str | None = Header(default=None, alias="x-api-key"),
     authorization: str | None = Header(default=None),
@@ -124,7 +164,7 @@ def health(settings: Settings = Depends(get_settings)) -> dict:
         "ok": True,
         "flaresolverr_url": settings.flaresolverr_url,
         "target_url": settings.target_url,
-        "proxy_mode": "warp" if active_proxy == settings.warp_proxy_url and active_proxy else ("base_proxy" if active_proxy else "direct"),
+        "proxy_mode": proxy_mode(settings, active_proxy),
     }
 
 
@@ -147,9 +187,12 @@ def solve_cf(payload: SolveRequest, settings: Settings = Depends(get_settings)) 
     except SolveError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    network = build_network_info(settings, proxy_url)
+
     return SolveResponse(
         status="ok",
         header=build_auth_header_info(sso_token, solved),
+        network=network,
     )
 
 
@@ -173,6 +216,7 @@ def inspect_token(payload: TokenRequest, settings: Settings = Depends(get_settin
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     header = build_auth_header_info(sso_token, solved)
+    network = build_network_info(settings, proxy_url)
 
     try:
         result = inspect_token_upstream(
@@ -187,6 +231,7 @@ def inspect_token(payload: TokenRequest, settings: Settings = Depends(get_settin
     return TokenResponse(
         status=str(result.get("status") or "ok"),
         header=header,
+        network=network,
         quota=result.get("quota") if isinstance(result.get("quota"), dict) else {},
         token_expired=bool(result.get("token_expired", False)),
         reason=str(result.get("reason") or "unknown"),

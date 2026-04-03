@@ -12,9 +12,17 @@ class HeaderInfo(BaseModel):
     userAgent: str
 
 
+class NetworkInfo(BaseModel):
+    proxy_mode: str
+    proxy_url: str
+    egress_ip: str
+    egress_ip_source: str
+
+
 class SolveResponse(BaseModel):
     status: str
     header: HeaderInfo
+    network: NetworkInfo
 
 
 class TokenRequest(BaseModel):
@@ -24,6 +32,7 @@ class TokenRequest(BaseModel):
 class TokenResponse(BaseModel):
     status: str
     header: HeaderInfo
+    network: NetworkInfo
     quota: dict[str, Any]
     token_expired: bool
     reason: str
